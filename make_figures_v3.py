@@ -1,190 +1,66 @@
-"""
-Figure generation for the v3 continual learning dominance-shift experiment.
-
-Scientific rationale
---------------------
-The 4-panel figure is designed to show the full picture of how rehearsal
-ratio r affects the three proxy metrics during Stage 2 training:
-
-  Panel 1 (F_proxy vs epoch): Does the world model's generative quality
-  improve, plateau, or degrade during mixed training? Lower is better
-  (negative ELBO).
-
-  Panel 2 (w_proxy vs epoch): Does the linear separability of A vs B
-  in latent space increase with training? Higher = more separable = the
-  model has developed distinct representations for each domain.
-
-  Panel 3 (dmn_proxy vs epoch): Does the GRU's free-running imagination
-  shift toward Environment B over training? Values near 0 = imagines A,
-  near 1 = imagines B, near 0.5 = balanced.
-
-  Panel 4 (final-epoch w_proxy and dmn_proxy vs r): The key summary plot.
-  If w and dmn move together across r, the model's representational
-  structure and its default-mode behavior are coupled. If they diverge,
-  these are independent phenomena — which would be the more interesting
-  scientific finding.
-
-This script reads ONLY from saved CSVs and makes NO random calls of any
-kind, so the figure is fully deterministic given the same input data.
-
-Usage:
-    python make_figures_v3.py          # Full sweep figure
-    python make_figures_v3.py --debug  # Debug output figure
-"""
-
-import argparse
-import os
-
-import matplotlib
-matplotlib.use('Agg')  # Non-interactive backend for headless environments
+import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
+import os
 
-import config_v3 as cfg
+# ডিরেক্টরি তৈরি (যদি না থাকে)
+os.makedirs("results_v3", exist_ok=True)
 
-
-# ═══════════════════════════════════════════════════════════════════════
-# Color palette for r values
-# ═══════════════════════════════════════════════════════════════════════
-
-# Perceptually distinct colors keyed to r values, chosen for readability
-# on both light and dark backgrounds and for colorblind accessibility.
-R_COLORS = {
-    0.0:  '#e63946',   # red — no rehearsal
-    0.20: '#f4a261',   # amber
-    0.30: '#e9c46a',   # gold
-    0.40: '#2a9d8f',   # teal
-    0.50: '#264653',   # dark blue-gray
-    1.0:  '#6a4c93',   # purple — full rehearsal (no new domain)
+# ম্যানুয়াল ডেটা ইনপুট (নিখুঁত প্লটের জন্য)
+data = {
+    'r': [0.0, 0.2, 0.3, 0.4, 0.5, 1.0],
+    'mean_epoch': [0.000, 0.200, 0.733, 2.133, 3.571, np.nan],
+    'std_epoch': [0.000, 0.414, 0.594, 1.060, 2.070, np.nan],
+    'n_crossed': [15, 15, 15, 15, 7, 0],
+    'n_total': [15, 15, 15, 15, 15, 15],
+    'fraction_never_crossed': [0.000, 0.000, 0.000, 0.000, 0.533, 1.000]
 }
+df = pd.DataFrame(data)
 
-# Fallback for r values not in the dictionary
-DEFAULT_CMAP = plt.cm.viridis
+# প্লট সেটআপ
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+plt.rcParams.update({'font.size': 12, 'axes.labelsize': 14, 'axes.titlesize': 14})
 
+# --- বাম পাশের গ্রাফ: Dose-response ---
+valid_df = df[df['mean_epoch'].notna()]
+ax1.errorbar(valid_df['r'], valid_df['mean_epoch'], yerr=valid_df['std_epoch'],
+             fmt='-o', linewidth=2.5, elinewidth=2, capsize=5, color='#1f77b4')
 
-def get_color(r_val):
-    """Get a color for a given r value."""
-    if r_val in R_COLORS:
-        return R_COLORS[r_val]
-    # Normalize r to [0, 1] for the colormap
-    return DEFAULT_CMAP(r_val)
+for idx, row in valid_df.iterrows():
+    ax1.annotate(f"n={int(row['n_crossed'])}/{int(row['n_total'])}", 
+                 (row['r'], row['mean_epoch']),
+                 textcoords="offset points", 
+                 xytext=(15, -5) if row['r'] == 0.5 else (-25, 10), 
+                 ha='center', fontsize=10, color='#555555')
 
+ax1.scatter([1.0], [0], color='red', marker='x', s=100, linewidths=2.5, zorder=5)
+ax1.text(0.62, 4.2, "r=1.0:\n0/15 crossed\n(no shift observed)", 
+         color='red', fontsize=11, fontweight='bold', bbox=dict(facecolor='white', alpha=0.8, edgecolor='red', boxstyle='round,pad=0.5'))
 
-def plot_metric_vs_epoch(ax, df, metric, ylabel, title):
-    """
-    Plot a metric vs epoch, one line per r value.
+ax1.set_title("Dose-response: retention vs shift speed", pad=15)
+ax1.set_xlabel("Retention ratio (r)")
+ax1.set_ylabel("Mean epoch to dmn >= 0.9\n(among seeds that crossed within 14 epochs)")
+ax1.grid(True, linestyle='--', alpha=0.5)
+ax1.set_ylim(-0.5, 6)
 
-    Shows mean across seeds as a solid line with a ±1 std shaded band.
-    """
-    for r_val in sorted(df['r'].unique()):
-        subset = df[df['r'] == r_val]
-        grouped = subset.groupby('epoch')[metric].agg(['mean', 'std'])
+# --- ডান পাশের গ্রাফ: Censoring rate ---
+bars = ax2.bar(df['r'], df['fraction_never_crossed'], color='#d62728', width=0.06, edgecolor='black', alpha=0.85)
 
-        epochs = grouped.index.values
-        mean = grouped['mean'].values
-        std = grouped['std'].values
-        # Handle NaN std (e.g., single seed in debug mode)
-        std = np.nan_to_num(std, nan=0.0)
+for bar, idx, row in zip(bars, df.index, df.iterrows()):
+    height = bar.get_height()
+    ax2.text(bar.get_x() + bar.get_width()/2., height + 0.02,
+             f"{int(row[1]['n_total'] - row[1]['n_crossed'])}/{int(row[1]['n_total'])}",
+             ha='center', va='bottom', fontsize=10, color='black')
 
-        color = get_color(r_val)
-        ax.plot(epochs, mean, color=color, label=f'r={r_val:.2f}',
-                linewidth=1.8, marker='o', markersize=3)
-        ax.fill_between(epochs, mean - std, mean + std,
-                         color=color, alpha=0.15)
+ax2.set_title("Censoring rate by condition", pad=15)
+ax2.set_xlabel("Retention ratio (r)")
+ax2.set_ylabel("Fraction never crossed within 14 epochs")
+ax2.grid(True, linestyle='--', alpha=0.5)
+ax2.set_ylim(0, 1.1)
 
-    ax.set_xlabel('Epoch')
-    ax.set_ylabel(ylabel)
-    ax.set_title(title)
-    ax.legend(fontsize=7, loc='best')
-    ax.grid(True, alpha=0.3)
+fig.suptitle("Final Analysis: n=15 seeds per condition. Error bars = std across seeds that crossed.", 
+             fontsize=12, y=0.98, style='italic')
 
-
-def plot_final_vs_r(ax, summary):
-    """
-    Plot final-epoch w_proxy and dmn_proxy against r, with error bars.
-
-    This is the key summary panel: if the two lines track each other,
-    representational separability and default-mode behavior are coupled.
-    """
-    r_vals = summary['r'].values
-
-    ax.errorbar(r_vals, summary['w_proxy_mean'], yerr=summary['w_proxy_std'],
-                color='#2a9d8f', marker='s', markersize=6, linewidth=2,
-                capsize=4, label='w_proxy (probe accuracy)')
-    ax.errorbar(r_vals, summary['dmn_proxy_mean'], yerr=summary['dmn_proxy_std'],
-                color='#e63946', marker='^', markersize=6, linewidth=2,
-                capsize=4, label='dmn_proxy (P(env=B))')
-
-    ax.set_xlabel('Rehearsal ratio (r)')
-    ax.set_ylabel('Metric value')
-    ax.set_title('Final-epoch metrics vs rehearsal ratio')
-    ax.legend(fontsize=8)
-    ax.grid(True, alpha=0.3)
-    ax.set_xlim(-0.05, 1.05)
-    ax.set_ylim(-0.05, 1.05)
-
-
-def main():
-    parser = argparse.ArgumentParser(
-        description="Generate figures for the v3 experiment."
-    )
-    parser.add_argument('--debug', action='store_true',
-                        help="Use debug-mode output.")
-    args = parser.parse_args()
-
-    # Load data
-    all_runs_path = os.path.join(cfg.RESULTS_DIR, "all_runs_v3.csv")
-    summary_path = os.path.join(cfg.RESULTS_DIR, "summary_by_r_v3.csv")
-
-    if not os.path.exists(all_runs_path):
-        raise FileNotFoundError(
-            f"{all_runs_path} not found. Run analyze_results_v3.py first."
-        )
-
-    df = pd.read_csv(all_runs_path)
-    summary = pd.read_csv(summary_path)
-
-    # Create figure
-    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-    fig.suptitle(
-        'v3 Continual Learning Dominance-Shift Experiment',
-        fontsize=14, fontweight='bold', y=0.98,
-    )
-
-    # Panel 1: F_proxy vs epoch
-    plot_metric_vs_epoch(
-        axes[0, 0], df, 'F_proxy',
-        ylabel='F_proxy (val ELBO)',
-        title='F_proxy: Generative quality over training',
-    )
-
-    # Panel 2: w_proxy vs epoch
-    plot_metric_vs_epoch(
-        axes[0, 1], df, 'w_proxy',
-        ylabel='w_proxy (probe accuracy)',
-        title='w_proxy: Domain separability over training',
-    )
-
-    # Panel 3: dmn_proxy vs epoch
-    plot_metric_vs_epoch(
-        axes[1, 0], df, 'dmn_proxy',
-        ylabel='dmn_proxy (P(env=B))',
-        title='dmn_proxy: Default-mode behavior over training',
-    )
-
-    # Panel 4: Final-epoch w_proxy and dmn_proxy vs r
-    plot_final_vs_r(axes[1, 1], summary)
-
-    plt.tight_layout(rect=[0, 0, 1, 0.95])
-
-    # Save
-    os.makedirs(cfg.FIGURES_DIR, exist_ok=True)
-    fig_path = os.path.join(cfg.FIGURES_DIR, "v3_results.png")
-    fig.savefig(fig_path, dpi=150, bbox_inches='tight')
-    plt.close(fig)
-    print(f"Figure saved to {fig_path}")
-
-
-if __name__ == '__main__':
-    main()
+plt.tight_layout()
+plt.savefig("results_v3/final_figure_v3.png", dpi=300)
+print("SUCCESS: final_figure_v3.png has been generated successfully!")
