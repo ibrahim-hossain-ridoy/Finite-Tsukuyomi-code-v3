@@ -175,3 +175,123 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+# --- New Analysis: Epoch to Threshold (dmn >= 0.9) with Censoring ---
+import glob
+import os
+import numpy as np
+import pandas as pd
+
+raw_files = sorted(glob.glob("results_v3/raw/seed*_r*.npz"))
+rows = []
+
+for f in raw_files:
+    d = np.load(f)
+    fname = os.path.basename(f)
+    seed = int(fname.split("seed")[1].split("_")[0])
+    r_val = float(fname.split("_r")[1].replace(".npz", ""))
+
+    dmn = d["dmn_proxy"]
+    epochs = d["epoch"]
+
+    crossed = np.where(dmn >= 0.9)[0]
+    epoch_to_cross = int(epochs[crossed[0]]) if len(crossed) > 0 else None
+
+    rows.append({
+        "seed": seed,
+        "r": r_val,
+        "epoch_to_dmn_0.9": epoch_to_cross,
+        "final_dmn": float(dmn[-1]),
+    })
+
+df = pd.DataFrame(rows)
+
+# Calculate Censoring (Fraction never crossed)
+df['crossed'] = df['epoch_to_dmn_0.9'].notna()
+summary = df.groupby("r").agg(
+    mean_epoch=("epoch_to_dmn_0.9", "mean"),
+    std_epoch=("epoch_to_dmn_0.9", "std"),
+    count_crossed=("epoch_to_dmn_0.9", "count"),
+    total_seeds=("seed", "count")
+)
+summary['fraction_never_crossed'] = 1.0 - (summary['count_crossed'] / summary['total_seeds'])
+
+print("\n--- Epoch to Threshold (dmn >= 0.9) Summary ---")
+print(summary)
+df.to_csv("results_v3/epoch_to_threshold_v3.csv", index=False)
+summary.to_csv("results_v3/summary_by_r_v3.csv")
+
+# --- Added: epoch-to-threshold analysis with censoring handling ---
+import numpy as np
+import glob
+import os
+
+def compute_epoch_to_threshold(threshold=0.9, max_epoch=14):
+    raw_files = sorted(glob.glob("results_v3/raw/seed*_r*.npz"))
+    rows = []
+    for f in raw_files:
+        d = np.load(f)
+        fname = os.path.basename(f)
+        seed = int(fname.split("seed")[1].split("_")[0])
+        r_val = float(fname.split("_r")[1].replace(".npz", ""))
+        dmn = d["dmn_proxy"]
+        epochs = d["epoch"]
+        crossed = np.where(dmn >= threshold)[0]
+        epoch_to_cross = int(epochs[crossed[0]]) if len(crossed) > 0 else None
+        rows.append({
+            "seed": seed, "r": r_val,
+            "epoch_to_dmn_0.9": epoch_to_cross,
+            "final_dmn": float(dmn[-1]),
+            "never_crossed": epoch_to_cross is None,
+        })
+    df = pd.DataFrame(rows)
+    summary = df.groupby("r").agg(
+        mean_epoch_to_cross=("epoch_to_dmn_0.9", "mean"),
+        std_epoch_to_cross=("epoch_to_dmn_0.9", "std"),
+        n_crossed=("epoch_to_dmn_0.9", "count"),
+        n_total=("seed", "count"),
+        fraction_never_crossed=("never_crossed", "mean"),
+    ).reset_index()
+    df.to_csv("results_v3/epoch_to_threshold_v3.csv", index=False)
+    print(summary.round(3).to_string(index=False))
+    return df, summary
+
+compute_epoch_to_threshold()
+
+
+# --- Added: epoch-to-threshold analysis with censoring handling ---
+import numpy as np
+import glob
+import os
+
+def compute_epoch_to_threshold(threshold=0.9, max_epoch=14):
+    raw_files = sorted(glob.glob("results_v3/raw/seed*_r*.npz"))
+    rows = []
+    for f in raw_files:
+        d = np.load(f)
+        fname = os.path.basename(f)
+        seed = int(fname.split("seed")[1].split("_")[0])
+        r_val = float(fname.split("_r")[1].replace(".npz", ""))
+        dmn = d["dmn_proxy"]
+        epochs = d["epoch"]
+        crossed = np.where(dmn >= threshold)[0]
+        epoch_to_cross = int(epochs[crossed[0]]) if len(crossed) > 0 else None
+        rows.append({
+            "seed": seed, "r": r_val,
+            "epoch_to_dmn_0.9": epoch_to_cross,
+            "final_dmn": float(dmn[-1]),
+            "never_crossed": epoch_to_cross is None,
+        })
+    df = pd.DataFrame(rows)
+    summary = df.groupby("r").agg(
+        mean_epoch_to_cross=("epoch_to_dmn_0.9", "mean"),
+        std_epoch_to_cross=("epoch_to_dmn_0.9", "std"),
+        n_crossed=("epoch_to_dmn_0.9", "count"),
+        n_total=("seed", "count"),
+        fraction_never_crossed=("never_crossed", "mean"),
+    ).reset_index()
+    df.to_csv("results_v3/epoch_to_threshold_v3.csv", index=False)
+    print(summary.round(3).to_string(index=False))
+    return df, summary
+
+compute_epoch_to_threshold()

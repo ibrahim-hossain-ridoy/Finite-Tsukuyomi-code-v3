@@ -133,3 +133,19 @@ Sweep: r ∈ {0.0, 0.20, 0.30, 0.40, 0.50, 1.0} × seeds {1, 2, 3, 4, 5}
 - Alain & Bengio (2016), "Understanding Intermediate Layers Using Linear
   Classifier Probes"
 - Kingma & Welling (2013), "Auto-Encoding Variational Bayes"
+
+
+## Known Limitations (Pilot Run)
+
+This is a pilot run with n=5 seeds per condition. Results should be treated
+as preliminary, not confirmatory.
+
+- At r=0.5, 2 of 5 seeds never crossed the dmn >= 0.9 threshold within the
+  14-epoch training window. The reported mean epoch-to-threshold at this
+  condition is computed only over the seeds that crossed, which likely
+  understates the true retention effect (censored data, not missing at
+  random).
+- A larger seed count (15+ per condition, especially at r=0.4 and r=0.5)
+  is needed before drawing any statistical conclusion about the
+  dose-response relationship between retention ratio and dominance-shift
+  speed.
