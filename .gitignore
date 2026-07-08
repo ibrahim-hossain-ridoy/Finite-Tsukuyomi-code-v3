@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.DS_Store
+data/
+checkpoints/
+results_v3/raw/*.pt
+.agents/

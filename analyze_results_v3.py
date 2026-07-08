@@ -195,6 +195,28 @@ def print_correlations(df):
 
 
 # ═══════════════════════════════════════════════════════════════════════
+# Output 3: relapse_stats_v3.csv
+# ═══════════════════════════════════════════════════════════════════════
+
+def compute_relapse_stats(df):
+    rows = []
+    for (seed, r_val), group in df.groupby(['seed', 'r']):
+        g = group.sort_values('epoch')
+        vals = g['dmn_proxy'].values
+        epochs = g['epoch'].values
+        peak_idx = int(np.argmax(vals))
+        rows.append({
+            'seed': seed,
+            'r': r_val,
+            'peak_dmn': float(vals[peak_idx]),
+            'peak_epoch': int(epochs[peak_idx]),
+            'final_dmn': float(vals[-1]),
+            'decline': float(vals[peak_idx] - vals[-1]),
+        })
+    return pd.DataFrame(rows)
+
+
+# ═══════════════════════════════════════════════════════════════════════
 # Main — single clean execution flow
 # ═══════════════════════════════════════════════════════════════════════
 
@@ -214,7 +236,12 @@ def main():
     all_runs_path = os.path.join(out_dir, "all_runs_v3.csv")
     df.to_csv(all_runs_path, index=False)
     print(f"Saved: {all_runs_path}")
-    
+
+    relapse_df = compute_relapse_stats(df)
+    relapse_path = os.path.join(out_dir, "relapse_stats_v3.csv")
+    relapse_df.to_csv(relapse_path, index=False)
+    print(f"Saved: {relapse_path}")
+
     # ── Step 2: Output 1 — summary_by_r_v3.csv ──
     summary = compute_summary(df)
     summary_path = os.path.join(out_dir, "summary_by_r_v3.csv")

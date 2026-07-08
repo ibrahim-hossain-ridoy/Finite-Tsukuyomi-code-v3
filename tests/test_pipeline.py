@@ -131,8 +131,8 @@ class TestConfig:
         assert cfg.R_VALUES == expected
 
     def test_seeds(self):
-        """SEEDS should be [1, 2, 3, 4, 5]."""
-        assert cfg.SEEDS == [1, 2, 3, 4, 5]
+        """SEEDS should be the full 15-seed sweep."""
+        assert cfg.SEEDS == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
 
 
 class TestParameterCount:
