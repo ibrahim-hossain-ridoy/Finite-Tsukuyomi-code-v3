@@ -211,7 +211,10 @@ def main():
 
     # ── Step 1: Load raw data ──
     df = load_all_runs(raw_dir)
-
+    all_runs_path = os.path.join(out_dir, "all_runs_v3.csv")
+    df.to_csv(all_runs_path, index=False)
+    print(f"Saved: {all_runs_path}")
+    
     # ── Step 2: Output 1 — summary_by_r_v3.csv ──
     summary = compute_summary(df)
     summary_path = os.path.join(out_dir, "summary_by_r_v3.csv")
