@@ -1,9 +1,8 @@
-# Ontological Inversion: V3 Computational Experiment
+# Constructed Reality, Contested Priors: V3 Computational Experiment
 
-Code and data for the neural network experiment reported in "Ontological
-Inversion: A Computational Framework for Permanent Generative Prior
-Replacement via Contrast-Driven Prediction Error Under the Free Energy
-Principle."
+Code and data for the neural network experiment reported in "Constructed
+Reality, Contested Priors: Decoupling and the Architecture of Cognitive
+Relapse Under the Free Energy Principle."
 
 ## Overview
 
@@ -205,66 +204,27 @@ deviation reported anywhere in the paper for "epoch to crossing" are
 computed only over rows where a crossing happened, with the fraction that
 never crossed reported as a separate column, never folded into the mean.
 
-### How the cognitive relapse statistic is computed, and a gap to close
+### How the cognitive relapse statistic is computed
 
-The peak-versus-final `dmn_proxy` analysis behind the cognitive relapse
-finding, the overshoot then partial regression seen at r=0.4 and r=0.5,
-is **not currently a function in `analyze_results_v3.py`**. It was
-computed directly against `all_runs_v3.csv` for the paper, not generated
-by any script in this repository as shipped. To make it reproducible from
-the documented pipeline, add this to `analyze_results_v3.py` and call it
-from `main()`:
-
-```python
-def compute_relapse_stats(df):
-    """
-    Per-seed peak dmn_proxy, the epoch it occurs at, the final-epoch
-    (epoch 14) value, and the decline between them. This is the
-    calculation behind the cognitive relapse finding.
-    """
-    rows = []
-    for (seed, r_val), group in df.groupby(['seed', 'r']):
-        g = group.sort_values('epoch')
-        vals = g['dmn_proxy'].values
-        epochs = g['epoch'].values
-        peak_idx = int(np.argmax(vals))
-        rows.append({
-            'seed': seed,
-            'r': r_val,
-            'peak_dmn': float(vals[peak_idx]),
-            'peak_epoch': int(epochs[peak_idx]),
-            'final_dmn': float(vals[-1]),
-            'decline': float(vals[peak_idx] - vals[-1]),
-        })
-    return pd.DataFrame(rows)
-```
-
-The logic: per seed, find the maximum `dmn_proxy` reached anywhere in the
-15-epoch run and the epoch it occurred at, compare it against the value
-at epoch 14, and call the difference the decline. Averaging `decline`
-across the 15 seeds for a given r reproduces the numbers in the paper's
-overshoot-and-regression table. This depends on `all_runs_v3.csv`
-existing, which itself depends on the fix described next.
+`compute_relapse_stats()` in `analyze_results_v3.py` produces
+`relapse_stats_v3.csv`, one row per (seed, r): per seed, it finds the
+maximum `dmn_proxy` reached anywhere in the 15-epoch run and the epoch
+it occurred at, compares that against the value at epoch 14, and
+records the difference as `decline`. Averaging `decline` across the 15
+seeds for a given r reproduces Table 3 in the paper exactly. This
+depends on `all_runs_v3.csv` existing, which is produced by the step
+described next.
 
 ### The all_runs_v3.csv dependency
 
-As shipped, `analyze_results_v3.py`'s `main()` only writes
-`summary_by_r_v3.csv` and `epoch_to_threshold_v3.csv`. It loads the full
-per-epoch dataframe (`load_all_runs()`) but never saves it. Every
-per-epoch analysis in this repository, including the relapse statistic
-above, depends on that dataframe being saved as `all_runs_v3.csv`. Add
-this inside `main()`, immediately after `df = load_all_runs(raw_dir)`:
-
-```python
-all_runs_path = os.path.join(out_dir, "all_runs_v3.csv")
-df.to_csv(all_runs_path, index=False)
-print(f"Saved: {all_runs_path}")
-```
-
-Without this line, a clean clone of this repository can reproduce the
-summary and threshold-crossing tables in the paper, but not the
-trajectory-level relapse finding, since the data it depends on is never
-written to disk.
+`analyze_results_v3.py`'s `main()` saves the full per-epoch dataframe
+(`load_all_runs()`) to `all_runs_v3.csv` immediately after loading it.
+Every per-epoch analysis in this repository, including the relapse
+statistic above, depends on this file existing. If you fork this
+pipeline and remove that save step, `compute_relapse_stats()` and any
+downstream trajectory-level analysis will no longer have the data they
+need, even though `summary_by_r_v3.csv` and `epoch_to_threshold_v3.csv`
+would still be produced correctly from the same in-memory dataframe.
 
 ### File Reference
 
@@ -273,7 +233,7 @@ config_v3.py             All hyperparameters, r values, seed list
 model_v3.py               VAE + GRU classes, loss functions, free-running rollout
 probe_decoder_v3.py       Linear probe training (w_proxy) and dmn_proxy computation
 run_experiment_v3.py      Main runner: Stage 1 + Stage 2 sweep, resumable
-analyze_results_v3.py     Load raw .npz output, produce the three CSVs described above
+analyze_results_v3.py     Load raw .npz output, produce the four CSVs described above
 make_figures_v3.py        Read CSVs, produce the 6-panel results figure
 requirements.txt          Python dependencies
 SETUP_COLAB.md            Colab-specific setup guide
@@ -295,7 +255,7 @@ python make_figures_v3.py --debug
 
 ```bash
 python run_experiment_v3.py      # 15 Stage 1 + 90 Stage 2 runs
-python analyze_results_v3.py     # produces all_runs_v3.csv, summary_by_r_v3.csv, epoch_to_threshold_v3.csv
+python analyze_results_v3.py     # produces all_runs_v3.csv, summary_by_r_v3.csv, epoch_to_threshold_v3.csv, relapse_stats_v3.csv
 python make_figures_v3.py        # produces v3_results.png
 ```
 
@@ -322,6 +282,7 @@ results_v3/
   all_runs_v3.csv
   summary_by_r_v3.csv
   epoch_to_threshold_v3.csv
+  relapse_stats_v3.csv
   figures/
     v3_results.png
 ```
