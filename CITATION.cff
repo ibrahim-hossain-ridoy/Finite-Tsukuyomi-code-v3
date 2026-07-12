@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this code, please cite the associated paper."
+title: "Finite-Tsukuyomi-code-v3"
+authors:
+  - family-names: "Ridoy"
+    given-names: "MD Ibrahim Hossain"
+    orcid: "https://orcid.org/0009-0002-7988-9414"
+repository-code: "https://github.com/ibrahim-hossain-ridoy/Finite-Tsukuyomi-code-v3"
+date-released: 2026-07-11
+license: MIT
+preferred-citation:
+  type: article
+  title: "Constructed Reality, Contested Priors: Decoupling and the Architecture of Cognitive Relapse Under the Free Energy Principle"
+  authors:
+    - family-names: "Ridoy"
+      given-names: "MD Ibrahim Hossain"
+  year: 2026
+  url: "https://arxiv.org/abs/XXXX.XXXXX"
+  doi: "10.48550/arXiv.XXXX.XXXXX"
